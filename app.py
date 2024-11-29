@@ -64,6 +64,11 @@ async def send_mail(interaction: discord.Interaction, profile_code: str, message
     """Send mail to another user using their profile code"""
     # Acknowledge the interaction first to avoid the "Unknown interaction" error
     await interaction.response.defer(ephemeral=True)
+
+    # Ensure that both profile_code and message are provided
+    if not profile_code or not message:
+        await interaction.followup.send("Please provide both a profile code and a message.", ephemeral=True)
+        return
     
     # Find the user by profile code
     Profile = Query()
@@ -91,30 +96,12 @@ async def view_mail(interaction: discord.Interaction):
 
     if mails_list:
         embed = discord.Embed(title="Your Mails", description="Here are your recent mails:", color=discord.Color.green())
-        for i, (mail) in enumerate(mails_list, 1):
+        for i, mail in enumerate(mails_list, 1):
             embed.add_field(name=f"Mail {i} from {mail['sender_name']}", value=mail['message'], inline=False)
 
         embed.set_footer(text="This is your private mailbox.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message("You have no new mail.", ephemeral=True)
-
-# Command to explore all authorized users
-@bot.tree.command(name="explore")
-async def explore(interaction: discord.Interaction):
-    """Display all authorized users and their profile codes"""
-    # Fetch all authorized users and their profile codes from the database
-    users = profiles_table.all()
-
-    # If there are no users, inform the caller
-    if not users:
-        await interaction.response.send_message("No authorized users found.", ephemeral=True)
-        return
-
-    # Create a message listing all users and their profile codes
-    user_list = "\n".join([f"User ID: {user['user_id']} - Profile Code: {user['profile_code']}" for user in users])
-
-    # Send the list as a message
-    await interaction.response.send_message(f"Authorized Users:\n{user_list}", ephemeral=True)
-
+        
 bot.run(DISCORD_TOKEN)
