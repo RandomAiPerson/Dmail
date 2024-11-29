@@ -48,20 +48,29 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Command to generate or view profile
 @bot.tree.command(name="profile")
 async def profile(interaction: discord.Interaction):
-    """Display the user's profile code and store it in the database"""
+    """Display the user's profile code and store it in the database with fancy UI"""
     # Generate a 4-digit profile code
     profile_code = ''.join(random.choices(string.digits, k=4))
 
     # Save the profile code in the database
     save_profile(interaction.user.id, interaction.user.name, profile_code)
 
-    # Respond with the user's profile code
-    await interaction.response.send_message(f"Your profile code is: {profile_code}", ephemeral=True)
+    # Create an embed with the user's profile information
+    embed = discord.Embed(
+        title=f"{interaction.user.name}'s Profile",
+        description=f"Here is your profile code:\n**{profile_code}**",
+        color=discord.Color.blue()
+    )
+    embed.set_thumbnail(url=interaction.user.avatar.url)  # Display the user's avatar
+    embed.set_footer(text="Profile Code is visible to others", icon_url=interaction.user.avatar.url)
+
+    # Respond with the user's profile code and a fancy embed
+    await interaction.response.send_message(embed=embed, ephemeral=False)
 
 # Command to send mail
 @bot.tree.command(name="send")
 async def send_mail(interaction: discord.Interaction, profile_code: str, message: str):
-    """Send mail to another user using their profile code"""
+    """Send mail to another user using their profile code with fancy UI"""
     # Acknowledge the interaction first to avoid the "Unknown interaction" error
     await interaction.response.defer(ephemeral=True)
 
@@ -81,7 +90,15 @@ async def send_mail(interaction: discord.Interaction, profile_code: str, message
             target_user_obj = await bot.fetch_user(target_user_id)
             await target_user_obj.send(f"You have received a new mail from {interaction.user.name}:\n\n{message}")
             save_mail(target_user_id, interaction.user.name, message)
-            await interaction.followup.send("Mail sent successfully!", ephemeral=True)
+
+            # Create a success embed
+            embed = discord.Embed(
+                title="Mail Sent!",
+                description=f"Your message was successfully sent to {target_user_obj.name}.",
+                color=discord.Color.green()
+            )
+            embed.set_footer(text="Thank you for using the mail system!")
+            await interaction.followup.send(embed=embed, ephemeral=True)
         except discord.NotFound:
             await interaction.followup.send("User not found or could not be messaged.", ephemeral=True)
     else:
@@ -90,18 +107,47 @@ async def send_mail(interaction: discord.Interaction, profile_code: str, message
 # Command to view received mail (only viewable by the user)
 @bot.tree.command(name="mail")
 async def view_mail(interaction: discord.Interaction):
-    """View any mail the user has received"""
+    """View any mail the user has received with fancy UI"""
     user_id = interaction.user.id
     mails_list = get_mail(user_id)
 
     if mails_list:
-        embed = discord.Embed(title="Your Mails", description="Here are your recent mails:", color=discord.Color.green())
+        embed = discord.Embed(
+            title="Your Mails",
+            description="Here are your recent mails:",
+            color=discord.Color.green()
+        )
         for i, mail in enumerate(mails_list, 1):
             embed.add_field(name=f"Mail {i} from {mail['sender_name']}", value=mail['message'], inline=False)
 
         embed.set_footer(text="This is your private mailbox.")
+        embed.set_thumbnail(url=interaction.user.avatar.url)  # Show user's avatar
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message("You have no new mail.", ephemeral=True)
-        
+
+# Command to explore all authorized users
+@bot.tree.command(name="explore")
+async def explore(interaction: discord.Interaction):
+    """Display all authorized users and their profile codes with fancy UI"""
+    # Fetch all authorized users and their profile codes from the database
+    users = profiles_table.all()
+
+    # If there are no users, inform the caller
+    if not users:
+        await interaction.response.send_message("No authorized users found.", ephemeral=True)
+        return
+
+    # Create a message listing all users and their profile codes
+    user_list = "\n".join([f"User: **{user['username']}** - Profile Code: **{user['profile_code']}**" for user in users])
+
+    # Create an embed for the user list
+    embed = discord.Embed(
+        title="Authorized Users",
+        description=user_list,
+        color=discord.Color.purple()
+    )
+    embed.set_footer(text="These are the authorized users with their profile codes.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 bot.run(DISCORD_TOKEN)
